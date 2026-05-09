@@ -1,0 +1,50 @@
+# M3TAL Dashboard - Pure Debian Hardened Base
+FROM debian:bookworm-slim
+
+# Prevent debris and speed up installs
+ENV DEBIAN_FRONTEND=noninteractive
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+
+# 1. System Hardening & Resilient Tooling (Apt-First Python)
+# Using Apt for core Python libs to bypass Pip corruption on unstable networks
+RUN for i in {1..5}; do apt-get update && apt-get upgrade -y && \
+    apt-get install -y --no-install-recommends \
+    python3 \
+    python3-pip \
+    curl \
+    procps \
+    python3-flask \
+    python3-requests \
+    python3-yaml \
+    python3-psutil \
+    python3-bcrypt \
+    python3-eventlet \
+    python3-flask-socketio \
+    python3-pytest \
+    python3-flake8 && break || sleep 5; done \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# 2. Python Toolchain Hardening (Using stable base-image pip)
+# Skipping upgrade to avoid hash-mismatch errors on unstable networks
+
+# 3. Application Setup
+WORKDIR /docker/dashboard
+COPY dashboard/requirements.txt .
+# Resilient install for any missing minor dependencies
+RUN python3 -m pip install --no-cache-dir --default-timeout=1000 --retries 10 -r requirements.txt || true
+
+# Copy source code
+COPY dashboard/ .
+
+# 4. Non-Root Execution Enforcement
+RUN groupadd -g 1000 appuser && \
+    useradd -m -u 1000 -g 1000 appuser && \
+    chown -R appuser:appuser /docker/dashboard && \
+    mkdir -p /docker/control-plane/state/logs && \
+    chown -R appuser:appuser /docker/control-plane/state/logs
+
+USER appuser
+
+# Startup command
+CMD ["python3", "server.py"]

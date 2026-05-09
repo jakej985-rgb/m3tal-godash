@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>M3TAL | Container Fleet</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v=1.5">
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+</head>
+<body>
+
+<header class="topbar">
+    <div class="topbar-left">
+        <div class="server-icon">🖥</div>
+        <div>
+            <div class="server-name">M3TAL Media Server</div>
+            <div class="server-sub">AI-Powered Docker Control Plane</div>
+        </div>
+    </div>
+    <nav class="topbar-center">
+        <a href="/"            class="nav-link">Dashboard</a>
+        <a href="/fleet"       class="nav-link active">Fleet</a>
+        <a href="/intelligence"class="nav-link">Intelligence</a>
+        <a href="/logs"        class="nav-link">Logs</a>
+        <a href="/logout"      class="nav-link danger">Logout</a>
+    </nav>
+    <div class="topbar-right">
+        <div class="status-online"><div class="status-dot"></div>ONLINE</div>
+        <div class="live-clock" id="live-clock">00:00:00</div>
+    </div>
+</header>
+
+<main class="page">
+    <div class="page-head">
+        <h1>Container <span>Fleet</span></h1>
+        <span class="badge running" id="fleet-online-badge">— online</span>
+    </div>
+
+    <!-- Stats row -->
+    <div class="stats-row" style="grid-template-columns: repeat(4, 1fr);">
+        <div class="stat-card">
+            <div class="stat-icon teal">📦</div>
+            <div class="stat-info"><div class="stat-label">Total</div><div class="stat-val" id="fl-total">—</div></div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon green">✓</div>
+            <div class="stat-info"><div class="stat-label">Online</div><div class="stat-val" style="color:var(--green)" id="fl-online">—</div></div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon amber">⚠</div>
+            <div class="stat-info"><div class="stat-label">Restarting</div><div class="stat-val" style="color:var(--amber)" id="fl-restart">—</div></div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon" style="background:var(--red-dim)">✕</div>
+            <div class="stat-info"><div class="stat-label">Offline</div><div class="stat-val" style="color:var(--red)" id="fl-offline">—</div></div>
+        </div>
+    </div>
+
+    <!-- View controls + grid -->
+    <div class="panel">
+        <div class="panel-head">
+            <div class="panel-title"><span class="panel-title-dot"></span>All Containers</div>
+            <div style="display:flex;gap:0.5rem">
+                <button class="panel-badge" onclick="setGrid(1)">List</button>
+                <button class="panel-badge" onclick="setGrid(2)">2×</button>
+                <button class="panel-badge" onclick="setGrid(3)">3×</button>
+                <button class="panel-badge" onclick="setGrid(4)">4×</button>
+            </div>
+        </div>
+        <div id="fleet-grid" class="fleet-grid" style="padding:1.25rem;">
+            <div class="loading-text">Loading fleet…</div>
+        </div>
+    </div>
+</main>
+
+<!-- ── MOBILE NAV ──────────────────────────── -->
+<nav class="mobile-nav">
+    <div class="mobile-nav-inner">
+        <a href="/" class="mobile-nav-link">
+            <div class="mobile-nav-icon">📊</div>
+            Dash
+        </a>
+        <a href="/fleet" class="mobile-nav-link active">
+            <div class="mobile-nav-icon">📦</div>
+            Fleet
+        </a>
+        <a href="/intelligence" class="mobile-nav-link">
+            <div class="mobile-nav-icon">🧠</div>
+            Intel
+        </a>
+        <a href="/logs" class="mobile-nav-link">
+            <div class="mobile-nav-icon">📄</div>
+            Logs
+        </a>
+    </div>
+</nav>
+
+<script>
+// Clock
+setInterval(() => {
+    const el = document.getElementById('live-clock');
+    if (!el) return;
+    const n = new Date();
+    el.textContent = [n.getHours(), n.getMinutes(), n.getSeconds()].map(v => String(v).padStart(2,'0')).join(':');
+}, 1000);
+
+async function loadFleet() {
+    try {
+        const [hRes, mRes] = await Promise.all([fetch('/api/health/report'), fetch('/api/metrics')]);
+        const hData = await hRes.json();
+        const mData = await mRes.json();
+
+        const metricsByName = {};
+        (mData.containers || []).forEach(c => {
+            metricsByName[c.name] = c;
+            metricsByName[c.name.replace('m3tal-', '')] = c;
+        });
+
+        const containers = hData?.agent_health?.monitor_containers?.containers || {};
+        const entries = Object.entries(containers);
+
+        const isOnline = s => ['online','running'].includes((s||'').toLowerCase());
+        const isRestart = s => (s||'').toLowerCase() === 'restarting';
+
+        const online  = entries.filter(([,v]) => isOnline(v.status)).length;
+        const restart = entries.filter(([,v]) => isRestart(v.status)).length;
+        const offline = entries.filter(([,v]) => !isOnline(v.status) && !isRestart(v.status)).length;
+
+        document.getElementById('fl-total').textContent   = entries.length;
+        document.getElementById('fl-online').textContent  = online;
+        document.getElementById('fl-restart').textContent = restart;
+        document.getElementById('fl-offline').textContent = offline;
+        document.getElementById('fleet-online-badge').textContent = `${online} / ${entries.length} running`;
+
+        const order = { running:0, online:0, restarting:1, offline:2, missing:3, unknown:4 };
+        entries.sort((a,b) => (order[(a[1].status||'').toLowerCase()]??4) - (order[(b[1].status||'').toLowerCase()]??4));
+
+        const grid = document.getElementById('fleet-grid');
+        if (entries.length === 0) {
+            grid.innerHTML = '<div class="loading-text">No container data yet. Agents are collecting…</div>';
+            return;
+        }
+
+        grid.innerHTML = entries.map(([name, info]) => {
+            const status = info.status || 'unknown';
+            const sc = isOnline(status) ? 'running' : isRestart(status) ? 'restarting' : 'offline';
+            const m  = metricsByName[name] || {};
+            const cpu = m.cpu != null ? m.cpu.toFixed(1) + '%' : '—';
+            const mem = m.mem_usage || '—';
+            return `
+                <div class="fleet-card">
+                    <div class="fleet-card-top">
+                        <span class="fleet-card-name">${name}</span>
+                        <span class="badge ${sc}">${status.toUpperCase()}</span>
+                    </div>
+                    <div class="fleet-card-detail">${info.raw_status || ''}</div>
+                    <div class="fleet-meta">
+                        <div class="fleet-meta-item">CPU<span>${cpu}</span></div>
+                        <div class="fleet-meta-item">RAM<span>${mem}</span></div>
+                    </div>
+                </div>`;
+        }).join('');
+    } catch (e) {
+        document.getElementById('fleet-grid').innerHTML = `<div class="loading-text" style="color:var(--red)">Error: ${e.message}</div>`;
+    }
+}
+
+function setGrid(cols) {
+    const grid = document.getElementById('fleet-grid');
+    grid.style.gridTemplateColumns = cols === 1 ? '1fr' : `repeat(${cols}, 1fr)`;
+    localStorage.setItem('fleet-cols', cols);
+}
+
+const savedCols = parseInt(localStorage.getItem('fleet-cols') || '3');
+setGrid(savedCols);
+
+loadFleet();
+setInterval(loadFleet, 10000);
+</script>
+</body>
+</html>
