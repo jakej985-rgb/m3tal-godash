@@ -41,8 +41,8 @@ COPY dashboard/ .
 RUN groupadd -g 1000 appuser && \
     useradd -m -u 1000 -g 1000 appuser && \
     chown -R appuser:appuser /docker/dashboard && \
-    mkdir -p /docker/control-plane/state/logs && \
-    chown -R appuser:appuser /docker/control-plane/state/logs
+    mkdir -p /docker/state/logs && \
+    chown -R appuser:appuser /docker/state/logs
 
 USER appuser
 

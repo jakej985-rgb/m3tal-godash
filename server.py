@@ -56,7 +56,7 @@ def get_repo_root():
     return str(Path(__file__).resolve().parent.parent)
 
 REPO_ROOT = get_repo_root()
-STATE_DIR = os.getenv("STATE_DIR") or os.path.join(REPO_ROOT, "control-plane", "state")
+STATE_DIR = os.getenv("STATE_DIR") or os.path.join(REPO_ROOT, "docker", "state")
 USERS_JSON = os.fspath(resolve_users_path(Path(__file__).resolve().parent))
 ASYNC_MODE = "eventlet" if eventlet is not None else "threading"
 AUTHENTICATED_ROOM = "authenticated-clients"
@@ -378,55 +378,18 @@ def api_action():
         })
 
     if action == "heal":
-        _audit_log("heal", "all", user, "STARTED")
-        try:
-            # Trigger the init.py repair function in a subprocess
-            repair_script = os.path.join(REPO_ROOT, "control-plane", "init.py")
-            if not os.path.exists(repair_script):
-                return jsonify({"ok": False, "error": "Repair script not found"}), 500
-
-            proc = _sp.run(
-                [sys.executable, repair_script, "--repair=all"],
-                capture_output=True, text=True, timeout=300,
-                cwd=os.path.join(REPO_ROOT, "control-plane")
-            )
-            result = "OK" if proc.returncode == 0 else f"EXIT {proc.returncode}"
-            _audit_log("heal", "all", user, result)
-            return jsonify({
-                "ok": proc.returncode == 0,
-                "message": "Heal cycle completed" if proc.returncode == 0 else "Heal encountered errors",
-                "output": (proc.stdout or "")[-2000:]
-            })
-        except _sp.TimeoutExpired:
-            _audit_log("heal", "all", user, "TIMEOUT")
-            return jsonify({"ok": False, "error": "Heal timed out after 5 minutes"}), 504
-        except Exception as e:
-            _audit_log("heal", "all", user, f"ERROR: {e}")
-            return jsonify({"ok": False, "error": str(e)}), 500
+        _audit_log("heal", "all", user, "OBSOLETE")
+        return jsonify({
+            "ok": False,
+            "error": "Legacy Python repair agents have been replaced by the native Go Healer. Use 'm3tal init' or check the Go runtime logs."
+        }), 410
 
     if action == "scan":
-        _audit_log("scan", "all", user, "STARTED")
-        # Trigger a health score recalculation
-        try:
-            scorer_script = os.path.join(REPO_ROOT, "control-plane", "agents", "health_score.py")
-            if os.path.exists(scorer_script):
-                _sp.run(
-                    [sys.executable, scorer_script, "--once"],
-                    capture_output=True, text=True, timeout=30,
-                    cwd=os.path.join(REPO_ROOT, "control-plane")
-                )
-            # Return fresh report
-            report = load_json_safe(HEALTH_REPORT_JSON)
-            _audit_log("scan", "all", user, "OK")
-            return jsonify({
-                "ok": True,
-                "score": report.get("score", 0),
-                "verdict": report.get("verdict", "Unknown"),
-                "issues": report.get("issues", []),
-            })
-        except Exception as e:
-            _audit_log("scan", "all", user, f"ERROR: {e}")
-            return jsonify({"ok": False, "error": str(e)}), 500
+        _audit_log("scan", "all", user, "OBSOLETE")
+        return jsonify({
+            "ok": False,
+            "error": "Legacy Python health scoring has been replaced by the native Go Intelligence Feed."
+        }), 410
 
     if action == "reboot":
         # Admin-only, Linux-only
@@ -451,7 +414,7 @@ def api_action():
 
 @socketio.on('connect')
 def handle_connect(auth=None, **kwargs):
-    global background_thread, _bg_started
+    global _bg_started
     # 🛡️ SECURITY FIX: Re-enforcing authentication check (Audit C2)
     if 'username' not in session:
         return False
