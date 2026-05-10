@@ -710,9 +710,8 @@ async function doAction(action, container) {
         const data = await res.json();
         
         if (data.ok) {
-            if (action === 'logs' && data.logs) {
-                // Show logs in an alert or custom overlay
-                alert(`Logs for ${container}:\n\n${data.logs.substring(0, 1000)}${data.logs.length > 1000 ? '...' : ''}`);
+            if (action === 'logs') {
+                window.location.href = `/logs?container=${container}`;
             } else {
                 btn.style.background = 'var(--green-dim)';
                 btn.style.color = 'var(--green)';

@@ -196,6 +196,17 @@ async function refreshTerminal() {
 
 async function fetchAll() {
     try {
+        // Handle direct deep-links from Fleet page (?container=name)
+        if (!window._initialLogCheck) {
+            const urlParams = new URLSearchParams(window.location.search);
+            const targetContainer = urlParams.get('container');
+            if (targetContainer) {
+                currentLog = targetContainer;
+                logType = 'docker';
+            }
+            window._initialLogCheck = true;
+        }
+
         // Fetch Agent Logs
         const logRes = await fetch('/api/logs');
         allLogs = await logRes.json();
