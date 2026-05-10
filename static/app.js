@@ -199,8 +199,14 @@ function pushChartPoint(cpu, mem, netDownStr, netUpStr) {
     // Parse network strings (e.g. "1.2 MB/s" -> 1.2)
     const parseSpeed = (s) => {
         if (!s || typeof s !== 'string') return 0;
-        const val = parseFloat(s.split(' ')[0]);
-        return isNaN(val) ? 0 : val;
+        const parts = s.split(' ');
+        const val = parseFloat(parts[0]);
+        if (isNaN(val)) return 0;
+        const unit = (parts[1] || '').toUpperCase();
+        if (unit.includes('K')) return val / 1024;
+        if (unit.includes('G')) return val * 1024;
+        if (unit.includes('B') && !unit.includes('M')) return val / (1024 * 1024);
+        return val;
     };
 
     chart.data.labels.push(timeStr);
