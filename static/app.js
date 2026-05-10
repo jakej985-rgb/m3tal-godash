@@ -597,10 +597,23 @@ async function refreshFleet() {
 
             const rowId = `details-${name.replace(/[^a-z0-9]/gi, '-')}`;
             
-            // Memory specs
+            // Stats parsing
             const memLimitGB = c.mem_limit ? (c.mem_limit / (1024*1024*1024)).toFixed(1) + ' GB' : '—';
             const memUsedMB  = c.mem_usage ? (c.mem_usage / (1024*1024)).toFixed(0) + ' MB' : '—';
             const isRowOpen  = window.openRows.has(rowId);
+
+            // Network Rates
+            if (!window.prevNet) window.prevNet = {};
+            const prev = window.prevNet[name] || { rx: c.net_rx, tx: c.net_tx, t: Date.now() };
+            const dt = (Date.now() - prev.t) / 1000;
+            const rxRate = dt > 0 ? (c.net_rx - prev.rx) / dt : 0;
+            const txRate = dt > 0 ? (c.net_tx - prev.tx) / dt : 0;
+            window.prevNet[name] = { rx: c.net_rx, tx: c.net_tx, t: Date.now() };
+
+            const formatNet = (b) => b < 1024*1024 ? (b/1024).toFixed(1) + ' KB/s' : (b/(1024*1024)).toFixed(1) + ' MB/s';
+            const formatTotal = (b) => b < 1024*1024*1024 ? (b/(1024*1024)).toFixed(0) + ' MB' : (b/(1024*1024*1024)).toFixed(1) + ' GB';
+
+            const getUsageClass = (val) => val > 80 ? 'high' : val > 40 ? 'mid' : 'low';
 
             html += `
                 <tr class="container-row" onclick="toggleRow('${rowId}')">
@@ -618,18 +631,63 @@ async function refreshFleet() {
                 <tr id="${rowId}" class="details-row" style="display: ${isRowOpen ? 'table-row' : 'none'};">
                     <td colspan="6">
                         <div class="details-box">
+                            <!-- 1: STATUS & HEALTH -->
                             <div class="details-metrics">
-                                <div style="margin-bottom: 0.5rem; opacity: 0.8; font-size: 0.75rem;">CONTAINER SPECS & TELEMETRY</div>
+                                <div style="opacity:0.5; font-size:0.7rem; margin-bottom:0.4rem;">STATUS & HEALTH</div>
                                 <div><strong>STATE:</strong> <span style="color:var(--text-1)">${state}</span></div>
-                                <div><strong>STATUS:</strong> <span style="color:var(--text-1)">${status}</span></div>
-                                <div><strong>MEM ALLOCATED:</strong> <span style="color:var(--teal)">${memLimitGB}</span></div>
-                                <div><strong>MEM UTILIZATION:</strong> <span style="color:var(--teal)">${memUsedMB} (${mem})</span></div>
-                                <div><strong>MANAGED BY M3TAL:</strong> ${c.managed ? '<span style="color:var(--green)">Yes</span>' : '<span style="color:var(--text-2)">No</span>'}</div>
-                                <div style="margin-top: 0.5rem; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 0.5rem;">
-                                    <strong>HOST THERMALS:</strong> <span style="color:var(--amber)">${cpuTemp}°C</span> (CPU) / <span style="color:var(--amber)">${gpuTemp}°C</span> (GPU)
+                                <div><strong>MANAGED:</strong> ${c.managed ? '<span style="color:var(--green)">YES</span>' : 'NO'}</div>
+                                <div style="font-size:0.7rem; opacity:0.8; margin-top:0.4rem;">${status}</div>
+                            </div>
+
+                            <!-- 2: CPU ENGINE -->
+                            <div class="details-metrics">
+                                <div style="opacity:0.5; font-size:0.7rem; margin-bottom:0.4rem;">CPU ENGINE</div>
+                                <div style="display:flex; justify-content:space-between;">
+                                    <strong>USAGE:</strong> <span style="color:var(--text-1)">${cpu}</span>
+                                </div>
+                                <div class="usage-track" style="height:4px; margin-top:0.5rem;">
+                                    <div class="usage-fill ${getUsageClass(c.cpu)}" style="width:${cpu}"></div>
                                 </div>
                             </div>
-                            <div class="details-actions">
+
+                            <!-- 3: MEMORY ALLOC -->
+                            <div class="details-metrics">
+                                <div style="opacity:0.5; font-size:0.7rem; margin-bottom:0.4rem;">MEMORY ALLOC</div>
+                                <div style="display:flex; justify-content:space-between;">
+                                    <strong>USE:</strong> <span style="color:var(--teal)">${memUsedMB}</span>
+                                    <span style="opacity:0.4">/ ${memLimitGB}</span>
+                                </div>
+                                <div class="usage-track" style="height:4px; margin-top:0.5rem;">
+                                    <div class="usage-fill ${getUsageClass(c.mem)}" style="width:${mem}"></div>
+                                </div>
+                            </div>
+
+                            <!-- 4: NETWORK I/O -->
+                            <div class="details-metrics">
+                                <div style="opacity:0.5; font-size:0.7rem; margin-bottom:0.4rem;">NETWORK I/O</div>
+                                <div style="display:grid; grid-template-columns: 1fr 1fr; gap:0.5rem;">
+                                    <div>
+                                        <div style="font-size:0.65rem; opacity:0.5;">DOWN</div>
+                                        <div style="color:var(--blue)">${formatNet(rxRate)}</div>
+                                        <div style="font-size:0.65rem; opacity:0.3;">${formatTotal(c.net_rx)}</div>
+                                    </div>
+                                    <div>
+                                        <div style="font-size:0.65rem; opacity:0.5;">UP</div>
+                                        <div style="color:var(--purple)">${formatNet(txRate)}</div>
+                                        <div style="font-size:0.65rem; opacity:0.3;">${formatTotal(c.net_tx)}</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- ACTIONS STACKED ON RIGHT (Absolute or Grid position) -->
+                            <div class="details-actions" style="grid-column: 5; display: none;">
+                                <!-- Removed from grid to match 4-column request, or I can use absolute -->
+                            </div>
+                        </div>
+                        
+                        <!-- Floating Actions Overlay -->
+                        <div style="position:relative;">
+                            <div class="details-actions" style="position:absolute; right:1.25rem; bottom:1.25rem;">
                                 <button class="big-btn scan action-btn" onclick="event.stopPropagation(); doAction('logs','${name}')">≡ Full Logs</button>
                                 <button class="big-btn heal action-btn" onclick="event.stopPropagation(); doAction('restart','${name}')">↺ Restart</button>
                                 <button class="big-btn reboot action-btn" onclick="event.stopPropagation(); doAction('stop','${name}')">■ Stop</button>

@@ -635,8 +635,8 @@ body::before {
 .details-box {
     padding: 1.25rem;
     display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 1.5rem;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1.25rem;
     font-family: var(--font-mono);
     font-size: 0.8rem;
     color: var(--text-2);
