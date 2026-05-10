@@ -13,6 +13,7 @@ from pathlib import Path
 from flask import Flask, render_template, jsonify, request, session, redirect, url_for
 from flask_socketio import SocketIO, emit, join_room
 from functools import wraps
+import requests
 
 import sys
 import traceback
@@ -319,6 +320,9 @@ def _audit_log(action, target, user, result):
     """Log all dashboard actions for traceability."""
     logger.info(f"[ACTION] user={user} action={action} target={target} result={result}")
 
+# Go Control Plane API Configuration
+GO_API_URL = os.getenv("GO_API_URL", "http://localhost:5050")
+
 @app.route('/api/action', methods=['POST'])
 @login_required()
 def api_action():
@@ -340,20 +344,21 @@ def api_action():
             return jsonify({"ok": False, "error": "Invalid container name"}), 400
 
         try:
-            proc = _sp.run(
-                ["docker", action, container],
-                capture_output=True, text=True, timeout=60
-            )
-            if proc.returncode != 0:
-                err = (proc.stderr or proc.stdout or "Unknown error").strip()
-                _audit_log(action, container, user, f"FAIL: {err}")
-                return jsonify({"ok": False, "error": err}), 500
+            # Forward action to Go Control Plane
+            api_endpoint = f"{GO_API_URL}/api/containers/{action}"
+            resp = requests.post(api_endpoint, json={"name": container}, timeout=15)
+            
+            if resp.status_code != 200:
+                err_data = resp.json() if resp.content else {}
+                err_msg = err_data.get("error", f"Go API Error {resp.status_code}")
+                _audit_log(action, container, user, f"FAIL: {err_msg}")
+                return jsonify({"ok": False, "error": err_msg}), resp.status_code
 
             _audit_log(action, container, user, "OK")
-            return jsonify({"ok": True, "message": f"{action} on {container} succeeded"})
-        except _sp.TimeoutExpired:
-            _audit_log(action, container, user, "TIMEOUT")
-            return jsonify({"ok": False, "error": f"Timed out after 60s"}), 504
+            return jsonify(resp.json())
+        except requests.exceptions.RequestException as e:
+            _audit_log(action, container, user, f"CONNECTION_ERROR: {e}")
+            return jsonify({"ok": False, "error": f"Failed to connect to Go Control Plane: {e}"}), 502
         except Exception as e:
             _audit_log(action, container, user, f"ERROR: {e}")
             return jsonify({"ok": False, "error": str(e)}), 500
