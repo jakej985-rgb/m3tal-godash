@@ -211,6 +211,12 @@ def get_decisions():
 def get_temperature():
     return jsonify(load_json_safe(TEMP_JSON))
 
+@app.route('/api/metrics/history')
+@login_required()
+def get_history():
+    history_json = os.path.join(STATE_DIR, 'history.json')
+    return jsonify(load_json_safe(history_json))
+
 @app.route('/api/metrics/storage')
 @login_required()
 def get_storage():

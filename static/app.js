@@ -44,9 +44,35 @@ async function refreshHistory() {
     try {
         const res = await fetch(`/api/metrics/history?hours=${currentHours}`);
         const data = await res.json();
-        // Update chart with historical data if available
-        // ... (Chart update logic)
-    } catch (e) {}
+        if (!data || !Array.isArray(data)) return;
+
+        const now = Math.floor(Date.now() / 1000);
+        const cutoff = now - (currentHours * 3600);
+        
+        // Filter and downsample if needed
+        const filtered = data.filter(p => p.timestamp >= cutoff);
+        
+        // For larger timeframes, we take every Nth point to keep the graph smooth
+        let step = 1;
+        if (currentHours > 12) step = 10;
+        else if (currentHours > 6) step = 5;
+
+        const plotData = filtered.filter((_, i) => i % step === 0);
+
+        chart.data.labels = plotData.map(p => {
+            const d = new Date(p.timestamp * 1000);
+            if (currentHours > 24) return `${d.getMonth()+1}/${d.getDate()} ${d.getHours()}:00`;
+            return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+        });
+        chart.data.datasets[0].data = plotData.map(p => p.cpu);
+        chart.data.datasets[1].data = plotData.map(p => p.mem);
+        chart.data.datasets[2].data = plotData.map(p => p.net_down || 0);
+        chart.data.datasets[3].data = plotData.map(p => p.net_up || 0);
+        
+        chart.update('none');
+    } catch (e) {
+        console.error("Failed to refresh history:", e);
+    }
 }
 
 function initChart() {
@@ -67,6 +93,7 @@ function initChart() {
                     tension: 0.4,
                     fill: true,
                     pointRadius: 0,
+                    yAxisID: 'y'
                 },
                 {
                     label: 'MEM',
@@ -77,6 +104,29 @@ function initChart() {
                     tension: 0.4,
                     fill: true,
                     pointRadius: 0,
+                    yAxisID: 'y'
+                },
+                {
+                    label: 'DOWN',
+                    data: [],
+                    borderColor: '#3b82f6',
+                    backgroundColor: 'rgba(59,130,246,0.08)',
+                    borderWidth: 1.5,
+                    tension: 0.4,
+                    fill: true,
+                    pointRadius: 0,
+                    yAxisID: 'y1'
+                },
+                {
+                    label: 'UP',
+                    data: [],
+                    borderColor: '#f59e0b',
+                    backgroundColor: 'rgba(245,158,11,0.08)',
+                    borderWidth: 1.5,
+                    tension: 0.4,
+                    fill: true,
+                    pointRadius: 0,
+                    yAxisID: 'y1'
                 }
             ]
         },
@@ -97,6 +147,17 @@ function initChart() {
                         color: '#4b5e75',
                         font: { family: "'JetBrains Mono', monospace", size: 10 },
                         callback: v => `${v}%`,
+                        maxTicksLimit: 5,
+                    },
+                    border: { display: false }
+                },
+                y1: {
+                    position: 'right',
+                    grid: { display: false },
+                    ticks: {
+                        color: '#4b5e75',
+                        font: { family: "'JetBrains Mono', monospace", size: 10 },
+                        callback: v => `${v} MB/s`,
                         maxTicksLimit: 5,
                     },
                     border: { display: false }
