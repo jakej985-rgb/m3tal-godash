@@ -18,10 +18,10 @@ tick();
 // ── Resource Chart ───────────────────────────────────────────────
 let chart = null;
 let currentHours = 1; 
-const MAX_POINTS = 60; // 1 point per minute = 1 hour
-const cpuData  = Array(MAX_POINTS).fill(null);
-const memData  = Array(MAX_POINTS).fill(null);
-const timeLabels = Array(MAX_POINTS).fill('');
+let maxGraphPoints = 60; // Dynamic based on timeframe
+const cpuData  = Array(60).fill(null);
+const memData  = Array(60).fill(null);
+const timeLabels = Array(60).fill('');
 
 function setTimeframe(val) {
     console.log(`Setting timeframe to: ${val}`);
@@ -49,17 +49,20 @@ async function refreshHistory() {
         const now = Math.floor(Date.now() / 1000);
         const cutoff = now - (currentHours * 3600);
         
-        // Filter and downsample if needed
-        const filtered = data.filter(p => p.timestamp >= cutoff);
+        // Filter history
+        let plotData = data.filter(p => p.timestamp >= cutoff);
         
-        // For larger timeframes, we take every Nth point to keep the graph smooth
-        let step = 1;
-        if (currentHours > 12) step = 10;
-        else if (currentHours > 6) step = 5;
-
-        const plotData = filtered.filter((_, i) => i % step === 0);
+        // Expected points (1 per minute)
+        maxGraphPoints = currentHours * 60;
+        
+        // Pad left with nulls if we don't have enough history
+        // This ensures the graph doesn't "shrink" or jump around
+        while (plotData.length < maxGraphPoints) {
+            plotData.unshift({ cpu: null, mem: null, net_down: null, net_up: null, timestamp: 0 });
+        }
 
         chart.data.labels = plotData.map(p => {
+            if (p.timestamp === 0) return "";
             const d = new Date(p.timestamp * 1000);
             if (currentHours > 24) return `${d.getMonth()+1}/${d.getDate()} ${d.getHours()}:00`;
             return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
@@ -201,7 +204,7 @@ function pushChartPoint(cpu, mem, netDownStr, netUpStr) {
     chart.data.datasets[2].data.push(parseSpeed(netDownStr));
     chart.data.datasets[3].data.push(parseSpeed(netUpStr));
     
-    if (chart.data.labels.length > MAX_POINTS) {
+    if (chart.data.labels.length > maxGraphPoints) {
         chart.data.labels.shift();
         chart.data.datasets.forEach(ds => ds.data.shift());
     }
