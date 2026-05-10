@@ -349,13 +349,20 @@ def api_action():
             resp = requests.post(api_endpoint, json={"name": container}, timeout=15)
             
             if resp.status_code != 200:
-                err_data = resp.json() if resp.content else {}
-                err_msg = err_data.get("error", f"Go API Error {resp.status_code}")
+                try:
+                    err_data = resp.json()
+                    err_msg = err_data.get("error", f"Go API Error {resp.status_code}")
+                except Exception:
+                    err_msg = resp.text[:200] or f"Go API Error {resp.status_code}"
+                
                 _audit_log(action, container, user, f"FAIL: {err_msg}")
                 return jsonify({"ok": False, "error": err_msg}), resp.status_code
 
             _audit_log(action, container, user, "OK")
-            return jsonify(resp.json())
+            try:
+                return jsonify(resp.json())
+            except Exception:
+                return jsonify({"ok": True, "logs": resp.text}) # Fallback for raw text logs
         except requests.exceptions.RequestException as e:
             _audit_log(action, container, user, f"CONNECTION_ERROR: {e}")
             return jsonify({"ok": False, "error": f"Failed to connect to Go Control Plane: {e}"}), 502
@@ -373,9 +380,17 @@ def api_action():
             api_endpoint = f"{GO_API_URL}/api/containers/logs"
             resp = requests.post(api_endpoint, json={"name": target, "tail": "80"}, timeout=15)
             if resp.status_code != 200:
-                err_data = resp.json() if resp.content else {}
-                return jsonify({"ok": False, "error": err_data.get("error", f"API Error {resp.status_code}")}), resp.status_code
-            return jsonify(resp.json())
+                try:
+                    err_data = resp.json()
+                    err_msg = err_data.get("error", f"API Error {resp.status_code}")
+                except Exception:
+                    err_msg = resp.text[:200] or f"API Error {resp.status_code}"
+                return jsonify({"ok": False, "error": err_msg}), resp.status_code
+            
+            try:
+                return jsonify(resp.json())
+            except Exception:
+                return jsonify({"ok": True, "logs": resp.text})
         except requests.exceptions.RequestException as e:
             return jsonify({"ok": False, "error": f"Failed to connect to Go Control Plane: {e}"}), 502
         except Exception as e:
