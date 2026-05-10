@@ -186,7 +186,7 @@ function initChart() {
     });
 }
 
-function pushChartPoint(cpu, mem, netDownStr, netUpStr) {
+function pushChartPoint(cpu, mem, netDownStr, netUpStr, data = {}) {
     if (!chart) return;
     
     // Only push live updates to the chart if we are in the 1H (Real-time) view
@@ -196,8 +196,9 @@ function pushChartPoint(cpu, mem, netDownStr, netUpStr) {
     const now = new Date();
     const timeStr = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
     
-    // Parse network strings (e.g. "1.2 MB/s" -> 1.2)
-    const parseSpeed = (s) => {
+    // Parse network strings (fallback if raw not available)
+    const parseSpeed = (v, s) => {
+        if (typeof v === 'number') return v;
         if (!s || typeof s !== 'string') return 0;
         const parts = s.split(' ');
         const val = parseFloat(parts[0]);
@@ -212,8 +213,8 @@ function pushChartPoint(cpu, mem, netDownStr, netUpStr) {
     chart.data.labels.push(timeStr);
     chart.data.datasets[0].data.push(cpu);
     chart.data.datasets[1].data.push(mem);
-    chart.data.datasets[2].data.push(parseSpeed(netDownStr));
-    chart.data.datasets[3].data.push(parseSpeed(netUpStr));
+    chart.data.datasets[2].data.push(parseSpeed(data.down_raw, netDownStr));
+    chart.data.datasets[3].data.push(parseSpeed(data.up_raw, netUpStr));
     
     if (chart.data.labels.length > maxGraphPoints) {
         chart.data.labels.shift();
@@ -289,7 +290,7 @@ socket.on('metrics_update', (data) => {
     setText('stat-mem', `${liveStats.mem.toFixed(1)} GB`);
 
     // Push to chart
-    pushChartPoint(liveStats.cpu, sys.mem || 0, liveStats.netDown, liveStats.netUp);
+    pushChartPoint(liveStats.cpu, sys.mem || 0, liveStats.netDown, liveStats.netUp, net);
 });
 
 // ── Helpers ───────────────────────────────────────────────────────
