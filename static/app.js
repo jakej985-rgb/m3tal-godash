@@ -428,82 +428,63 @@ async function refreshLinks() {
 // ── Container table ───────────────────────────────────────────────
 async function refreshFleet() {
     try {
-        const [hRes, mRes] = await Promise.all([
+        const [hRes, rRes, tRes, sRes] = await Promise.all([
+            fetch('/api/health'),
             fetch('/api/health/report'),
-            fetch('/api/metrics')
-        ]);
-        const hData = await hRes.json();
-        const mData = await mRes.json();
-
-        // Build metrics lookup
-        const metricsByName = {};
-        (mData.containers || []).forEach(c => {
-            metricsByName[c.name] = c;
-            metricsByName[c.name.replace('m3tal-', '')] = c;
-        });
-
-        const containers = hData?.agent_health?.monitor_containers?.containers || {};
-        const entries = Object.entries(containers);
-
-        // Stat cards
-        const online  = entries.filter(([,v]) => ['online','running'].includes((v.status||'').toLowerCase())).length;
-        const total   = entries.length;
-        setText('stat-fleet-count', `${online} / ${total} UP`);
-
-        // Uptime (Merged into System Fleet)
-        const uptimeSubEl = document.getElementById('stat-fleet-uptime');
-        if (uptimeSubEl && hData.uptime) uptimeSubEl.textContent = hData.uptime;
-
-        // Hardware metrics for expanded view
-        const [tRes, sRes] = await Promise.all([
             fetch('/api/metrics/temperature'),
             fetch('/api/metrics/storage')
         ]);
+        const hData = await hRes.json();
+        const rData = await rRes.json();
         const tData = await tRes.json();
         const sData = await sRes.json();
+
+        // Go backend writes containers as a flat array in health.json
+        const containers = hData.containers || [];
+        const online = containers.filter(c => (c.state || '').toLowerCase() === 'running').length;
+        const total = containers.length;
+        setText('stat-fleet-count', `${online} / ${total} UP`);
+
+        // Uptime from health report
+        const uptimeSubEl = document.getElementById('stat-fleet-uptime');
+        if (uptimeSubEl && rData.uptime) uptimeSubEl.textContent = rData.uptime;
 
         // Table body
         const tbody = document.getElementById('fleet-tbody');
         if (!tbody) return;
 
-        if (entries.length === 0) {
+        if (containers.length === 0) {
             tbody.innerHTML = '<tr><td colspan="6" class="loading-text">Waiting for agent data…</td></tr>';
             return;
         }
 
         // Sort: running first
-        const order = { running: 0, online: 0, restarting: 1, offline: 2, missing: 3, unknown: 4 };
-        entries.sort((a, b) => (order[(a[1].status||'').toLowerCase()] ?? 4) - (order[(b[1].status||'').toLowerCase()] ?? 4));
+        const order = { running: 0, created: 1, restarting: 2, paused: 3, exited: 4, dead: 5 };
+        containers.sort((a, b) => (order[(a.state||'').toLowerCase()] ?? 6) - (order[(b.state||'').toLowerCase()] ?? 6));
 
         let html = '';
-        entries.forEach(([name, info]) => {
-            const status = info.status || 'unknown';
-            const sc     = getStatusClass(status);
-            const m      = metricsByName[name] || {};
-            const cpu    = m.cpu  != null ? m.cpu.toFixed(1)  + '%' : '—';
-            const mem    = m.mem_usage || '—';
-            const uptime = info.raw_status || '—';
-            const cpuClass = m.cpu != null ? getCpuClass(m.cpu) : '';
-            
+        containers.forEach(c => {
+            const name   = c.name || 'unknown';
+            const state  = c.state || 'unknown';
+            const status = c.status || state;
+            const sc     = getStatusClass(state);
+            const cpu    = c.cpu != null ? c.cpu.toFixed(1) + '%' : '—';
+            const mem    = c.mem != null ? c.mem.toFixed(1) + '%' : '—';
+            const cpuClass = c.cpu != null ? getCpuClass(c.cpu) : '';
+
             // Sub-metrics for details
             const cpuTemp = tData.cpu_temp != null ? Math.round(tData.cpu_temp) : '--';
             const gpuTemp = tData.gpu_temp != null ? Math.round(tData.gpu_temp) : '--';
-            const storage = sData.disks?.root?.percent != null ? sData.disks.root.percent + '%' : '—';
-            
-            // Pressure Calculations
-            const cpuPress = m.cpu_pressure || 0;
-            const memPress = m.mem || 0; // docker stats MemPerc is relative to limit
-            const sysPress = Math.round((cpuPress + memPress) / 2);
 
             const rowId = `details-${name.replace(/[^a-z0-9]/gi, '-')}`;
 
             html += `
                 <tr class="container-row" onclick="toggleRow('${rowId}')">
                     <td><span class="container-name">${name}</span></td>
-                    <td><span class="badge ${sc}">${status.toUpperCase()}</span></td>
+                    <td><span class="badge ${sc}">${state.toUpperCase()}</span></td>
                     <td class="metric-cell ${cpuClass}">${cpu}</td>
                     <td class="metric-cell">${mem}</td>
-                    <td class="metric-cell">${uptime}</td>
+                    <td class="metric-cell">${status}</td>
                     <td>
                         <div class="actions-cell">
                             <button class="action-btn logs" title="Logs" onclick="event.stopPropagation(); doAction('logs','${name}')">≡</button>
@@ -514,15 +495,13 @@ async function refreshFleet() {
                     <td colspan="6">
                         <div class="details-box">
                             <div class="details-metrics">
-                                <div style="margin-bottom: 0.5rem; opacity: 0.8; font-size: 0.75rem;">RESOURCE PRESSURE (Limit-Relative)</div>
-                                <div class="pressure-line">CPU: ${renderBar(cpuPress)} ${cpuPress}%</div>
-                                <div class="pressure-line">RAM: ${renderBar(memPress)} ${memPress}%</div>
-                                <div class="pressure-line">SYS: ${renderBar(sysPress)} ${sysPress}%</div>
+                                <div style="margin-bottom: 0.5rem; opacity: 0.8; font-size: 0.75rem;">CONTAINER DETAILS</div>
+                                <div><strong>STATE:</strong> ${state}</div>
+                                <div><strong>STATUS:</strong> ${status}</div>
+                                <div><strong>MANAGED:</strong> ${c.managed ? 'Yes' : 'No'}</div>
                                 <div style="margin-top: 0.5rem; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 0.5rem;">
-                                    <strong>MEM Usage:</strong> ${mem}
+                                    <strong>HOST TEMP:</strong> ${cpuTemp}°C / ${gpuTemp}°C
                                 </div>
-                                <div><strong>TEMP:</strong> ${cpuTemp}°C / ${gpuTemp}°C</div>
-                                <div><strong>STORAGE:</strong> ${storage}</div>
                             </div>
                             <div class="details-actions">
                                 <button class="big-btn heal action-btn" onclick="event.stopPropagation(); doAction('restart','${name}')">↺ Restart</button>

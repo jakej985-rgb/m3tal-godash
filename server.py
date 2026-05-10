@@ -229,7 +229,11 @@ def get_network_routes():
     try:
         if os.path.exists(network_json):
             with open(network_json, 'r') as f:
-                return jsonify(json.load(f))
+                data = json.load(f)
+            # Go backend writes {"metrics": {...}, "links": [...]}
+            if isinstance(data, dict):
+                return jsonify(data.get("links", []))
+            return jsonify(data if isinstance(data, list) else [])
         return jsonify([])
     except Exception as e:
         app.logger.error(f"[NETWORK] Failed to read network.json: {e}")
@@ -433,7 +437,12 @@ def handle_connect(auth=None, **kwargs):
 
 def emit_metrics_update():
     metrics = load_json_safe(METRICS_JSON)
-    socketio.emit('metrics_update', metrics, to=AUTHENTICATED_ROOM)
+    network_data = load_json_safe(os.path.join(STATE_DIR, 'network.json'))
+    payload = {
+        "system": metrics,
+        "network": network_data.get("metrics", {}),
+    }
+    socketio.emit('metrics_update', payload, to=AUTHENTICATED_ROOM)
 
 def background_metrics_stream():
     """Push real-time metric updates to all connected clients."""
