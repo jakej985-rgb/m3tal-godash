@@ -681,7 +681,7 @@ async function refreshFleet() {
 
                             <!-- 5: ACTIONS (Now part of the grid for responsiveness) -->
                             <div class="details-actions">
-                                <button class="big-btn scan action-btn" onclick="event.stopPropagation(); doAction('logs','${name}')">≡ Full Logs</button>
+                                <button class="big-btn scan action-btn" onclick="event.stopPropagation(); window.location.href='/logs?container=${name}'">≡ Full Logs</button>
                                 <button class="big-btn heal action-btn" onclick="event.stopPropagation(); doAction('restart','${name}')">↺ Restart</button>
                                 <button class="big-btn reboot action-btn" onclick="event.stopPropagation(); doAction('stop','${name}')">■ Stop</button>
                             </div>

@@ -312,7 +312,7 @@ import subprocess as _sp
 import re as _re
 
 # Whitelist of allowed container actions to prevent injection
-_CONTAINER_ACTIONS = {"restart", "stop", "start"}
+_CONTAINER_ACTIONS = {"restart", "stop", "start", "logs"}
 # Sanitize container names — only allow alphanumeric, dash, underscore, dot
 _SAFE_NAME = _re.compile(r'^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$')
 
@@ -372,7 +372,7 @@ def api_action():
 
     # ── Container logs (returns log text, not an action) ──────────
     if action == "logs":
-        target = (data.get('target') or '').strip()
+        target = (data.get('target') or data.get('container') or '').strip()
         if not target or not _SAFE_NAME.match(target):
             return jsonify({"ok": False, "error": "Invalid container name for logs"}), 400
         try:
