@@ -50,7 +50,7 @@ USER appuser
 LABEL org.opencontainers.image.title="M3TAL Dashboard" \
       org.opencontainers.image.description="AI-Powered Docker Control Plane Dashboard" \
       org.opencontainers.image.vendor="M3TAL" \
-      org.opencontainers.image.logo="https://raw.githubusercontent.com/jakej985-rgb/M3tal-Media-Server/main/docs/logo.svg"
+      org.opencontainers.image.logo="https://raw.githubusercontent.com/jakej985-rgb/M3tal-Media-Server/main/docs/godash_logo.svg"
 
 # Startup command
 CMD ["python3", "server.py"]
