@@ -578,6 +578,9 @@ async function refreshFleet() {
         const order = { running: 0, created: 1, restarting: 2, paused: 3, exited: 4, dead: 5 };
         containers.sort((a, b) => (order[(a.state||'').toLowerCase()] ?? 6) - (order[(b.state||'').toLowerCase()] ?? 6));
 
+        // Tracking open rows
+        if (!window.openRows) window.openRows = new Set();
+
         let html = '';
         containers.forEach(c => {
             const name   = c.name || 'unknown';
@@ -593,6 +596,11 @@ async function refreshFleet() {
             const gpuTemp = tData.gpu_temp != null ? Math.round(tData.gpu_temp) : '--';
 
             const rowId = `details-${name.replace(/[^a-z0-9]/gi, '-')}`;
+            
+            // Memory specs
+            const memLimitGB = c.mem_limit ? (c.mem_limit / (1024*1024*1024)).toFixed(1) + ' GB' : '—';
+            const memUsedMB  = c.mem_usage ? (c.mem_usage / (1024*1024)).toFixed(0) + ' MB' : '—';
+            const isRowOpen  = window.openRows.has(rowId);
 
             html += `
                 <tr class="container-row" onclick="toggleRow('${rowId}')">
@@ -607,22 +615,24 @@ async function refreshFleet() {
                         </div>
                     </td>
                 </tr>
-                <tr id="${rowId}" class="details-row" style="display: none;">
+                <tr id="${rowId}" class="details-row" style="display: ${isRowOpen ? 'table-row' : 'none'};">
                     <td colspan="6">
                         <div class="details-box">
                             <div class="details-metrics">
-                                <div style="margin-bottom: 0.5rem; opacity: 0.8; font-size: 0.75rem;">CONTAINER DETAILS</div>
-                                <div><strong>STATE:</strong> ${state}</div>
-                                <div><strong>STATUS:</strong> ${status}</div>
-                                <div><strong>MANAGED:</strong> ${c.managed ? 'Yes' : 'No'}</div>
+                                <div style="margin-bottom: 0.5rem; opacity: 0.8; font-size: 0.75rem;">CONTAINER SPECS & TELEMETRY</div>
+                                <div><strong>STATE:</strong> <span style="color:var(--text-1)">${state}</span></div>
+                                <div><strong>STATUS:</strong> <span style="color:var(--text-1)">${status}</span></div>
+                                <div><strong>MEM ALLOCATED:</strong> <span style="color:var(--teal)">${memLimitGB}</span></div>
+                                <div><strong>MEM UTILIZATION:</strong> <span style="color:var(--teal)">${memUsedMB} (${mem})</span></div>
+                                <div><strong>MANAGED BY M3TAL:</strong> ${c.managed ? '<span style="color:var(--green)">Yes</span>' : '<span style="color:var(--text-2)">No</span>'}</div>
                                 <div style="margin-top: 0.5rem; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 0.5rem;">
-                                    <strong>HOST TEMP:</strong> ${cpuTemp}°C / ${gpuTemp}°C
+                                    <strong>HOST THERMALS:</strong> <span style="color:var(--amber)">${cpuTemp}°C</span> (CPU) / <span style="color:var(--amber)">${gpuTemp}°C</span> (GPU)
                                 </div>
                             </div>
                             <div class="details-actions">
+                                <button class="big-btn scan action-btn" onclick="event.stopPropagation(); doAction('logs','${name}')">≡ Full Logs</button>
                                 <button class="big-btn heal action-btn" onclick="event.stopPropagation(); doAction('restart','${name}')">↺ Restart</button>
                                 <button class="big-btn reboot action-btn" onclick="event.stopPropagation(); doAction('stop','${name}')">■ Stop</button>
-                                <button class="big-btn scan action-btn" onclick="event.stopPropagation(); doAction('logs','${name}')">≡ Logs</button>
                             </div>
                         </div>
                     </td>
@@ -631,6 +641,20 @@ async function refreshFleet() {
         });
         tbody.innerHTML = html;
     } catch (_) {}
+}
+
+function toggleRow(id) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const isVisible = el.style.display !== 'none';
+    el.style.display = isVisible ? 'none' : 'table-row';
+    
+    if (!window.openRows) window.openRows = new Set();
+    if (isVisible) {
+        window.openRows.delete(id);
+    } else {
+        window.openRows.add(id);
+    }
 }
 
 // ── Activity feed ─────────────────────────────────────────────────

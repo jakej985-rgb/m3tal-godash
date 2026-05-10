@@ -145,9 +145,12 @@ async function loadFleet() {
             const state = (c.state || c.status || 'unknown').toLowerCase();
             const sc = isOnline(state) ? 'running' : isRestart(state) ? 'restarting' : 'offline';
             
-            const cpu = c.cpu != null ? c.cpu.toFixed(1) + '%' : '—';
-            // If the backend doesn't provide mem usage string, we can try to find it in metrics
-            const mem = c.mem != null ? c.mem.toFixed(1) + '%' : '—';
+            const cpuVal = c.cpu || 0;
+            const memVal = c.mem || 0;
+            const cpu = cpuVal.toFixed(1) + '%';
+            const mem = memVal.toFixed(1) + '%';
+            
+            const getUsageClass = (val) => val > 80 ? 'high' : val > 40 ? 'mid' : 'low';
             
             return `
                 <div class="fleet-card">
@@ -157,8 +160,14 @@ async function loadFleet() {
                     </div>
                     <div class="fleet-card-detail">${c.status || state}</div>
                     <div class="fleet-meta">
-                        <div class="fleet-meta-item">CPU<span>${cpu}</span></div>
-                        <div class="fleet-meta-item">RAM<span>${mem}</span></div>
+                        <div class="fleet-meta-item">
+                            CPU <span>${cpu}</span>
+                            <div class="usage-track"><div class="usage-fill ${getUsageClass(cpuVal)}" style="width:${cpu}"></div></div>
+                        </div>
+                        <div class="fleet-meta-item">
+                            RAM <span>${mem}</span>
+                            <div class="usage-track"><div class="usage-fill ${getUsageClass(memVal)}" style="width:${mem}"></div></div>
+                        </div>
                     </div>
                 </div>`;
         }).join('');
