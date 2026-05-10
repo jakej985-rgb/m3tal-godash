@@ -30,12 +30,12 @@ RUN for i in {1..5}; do apt-get update && apt-get upgrade -y && \
 
 # 3. Application Setup
 WORKDIR /docker/dashboard
-COPY dashboard/requirements.txt .
+COPY requirements.txt .
 # Resilient install for any missing minor dependencies
 RUN python3 -m pip install --no-cache-dir --default-timeout=1000 --retries 10 -r requirements.txt || true
 
 # Copy source code
-COPY dashboard/ .
+COPY . .
 
 # 4. Non-Root Execution Enforcement
 RUN groupadd -g 1000 appuser && \
