@@ -156,11 +156,16 @@ function initChart() {
                 },
                 y1: {
                     position: 'right',
+                    beginAtZero: true,
                     grid: { display: false },
                     ticks: {
                         color: '#4b5e75',
                         font: { family: "'JetBrains Mono', monospace", size: 10 },
-                        callback: v => `${v} MB/s`,
+                        callback: function(v) {
+                            if (v >= 1) return v.toFixed(1) + ' MB/s';
+                            if (v > 0) return (v * 1024).toFixed(0) + ' KB/s';
+                            return '0 MB/s';
+                        },
                         maxTicksLimit: 5,
                     },
                     border: { display: false }
