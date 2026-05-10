@@ -635,11 +635,26 @@ body::before {
 .details-box {
     padding: 1.25rem;
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(5, 1fr);
     gap: 1.25rem;
     font-family: var(--font-mono);
     font-size: 0.8rem;
     color: var(--text-2);
+}
+
+@media (max-width: 1400px) {
+    .details-box { grid-template-columns: repeat(3, 1fr); }
+    .details-actions { grid-column: span 3; flex-direction: row !important; align-items: center !important; }
+}
+
+@media (max-width: 900px) {
+    .details-box { grid-template-columns: repeat(2, 1fr); }
+    .details-actions { grid-column: span 2; }
+}
+
+@media (max-width: 600px) {
+    .details-box { grid-template-columns: 1fr; }
+    .details-actions { grid-column: span 1; }
 }
 
 .pressure-line {

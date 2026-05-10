@@ -679,15 +679,8 @@ async function refreshFleet() {
                                 </div>
                             </div>
 
-                            <!-- ACTIONS STACKED ON RIGHT (Absolute or Grid position) -->
-                            <div class="details-actions" style="grid-column: 5; display: none;">
-                                <!-- Removed from grid to match 4-column request, or I can use absolute -->
-                            </div>
-                        </div>
-                        
-                        <!-- Floating Actions Overlay -->
-                        <div style="position:relative;">
-                            <div class="details-actions" style="position:absolute; right:1.25rem; bottom:1.25rem;">
+                            <!-- 5: ACTIONS (Now part of the grid for responsiveness) -->
+                            <div class="details-actions">
                                 <button class="big-btn scan action-btn" onclick="event.stopPropagation(); doAction('logs','${name}')">≡ Full Logs</button>
                                 <button class="big-btn heal action-btn" onclick="event.stopPropagation(); doAction('restart','${name}')">↺ Restart</button>
                                 <button class="big-btn reboot action-btn" onclick="event.stopPropagation(); doAction('stop','${name}')">■ Stop</button>
