@@ -30,13 +30,30 @@
     </nav>
 
     <div class="topbar-right">
-        <div class="status-online">
+        <div class="status-online hide-mobile">
             <div class="status-dot"></div>
             ONLINE
         </div>
-        <div class="live-clock" id="live-clock">00:00:00</div>
+        <div class="live-clock hide-mobile" id="live-clock">00:00:00</div>
+        <button id="menu-toggle" class="menu-toggle" onclick="toggleDrawer()">☰</button>
     </div>
 </header>
+
+<!-- ── MOBILE DRAWER ────────────────────────── -->
+<div id="mobile-drawer" class="mobile-drawer">
+    <div class="drawer-header">
+        <div class="server-name">M3TAL NAVIGATION</div>
+        <button class="drawer-close" onclick="toggleDrawer()">×</button>
+    </div>
+    <nav class="drawer-links">
+        <a href="/"            class="drawer-link active">Dashboard</a>
+        <a href="/fleet"       class="drawer-link">Fleet</a>
+        <a href="/intelligence"class="drawer-link">Intelligence</a>
+        <a href="/logs"        class="drawer-link">Logs</a>
+        <div class="drawer-divider"></div>
+        <a href="/logout"      class="drawer-link danger">Logout</a>
+    </nav>
+</div>
 
 <!-- ── PAGE ────────────────────────────────── -->
 <main class="page">

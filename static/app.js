@@ -293,6 +293,25 @@ socket.on('metrics_update', (data) => {
     pushChartPoint(liveStats.cpu, sys.mem || 0, liveStats.netDown, liveStats.netUp, net);
 });
 
+// ── Mobile Drawer ──────────────────────────────────────────────────
+function toggleDrawer() {
+    const drawer = document.getElementById('mobile-drawer');
+    if (drawer) {
+        drawer.classList.toggle('open');
+    }
+}
+
+// Close drawer when clicking outside
+document.addEventListener('click', (e) => {
+    const drawer = document.getElementById('mobile-drawer');
+    const toggle = document.getElementById('menu-toggle');
+    if (drawer && drawer.classList.contains('open')) {
+        if (!drawer.contains(e.target) && !toggle.contains(e.target)) {
+            drawer.classList.remove('open');
+        }
+    }
+});
+
 // ── Helpers ───────────────────────────────────────────────────────
 function setText(id, val) {
     const el = document.getElementById(id);
