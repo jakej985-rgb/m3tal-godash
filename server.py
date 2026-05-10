@@ -369,12 +369,15 @@ def api_action():
         if not target or not _SAFE_NAME.match(target):
             return jsonify({"ok": False, "error": "Invalid container name for logs"}), 400
         try:
-            proc = _sp.run(
-                ["docker", "logs", "--tail", "80", target],
-                capture_output=True, text=True, timeout=15
-            )
-            output = proc.stdout or proc.stderr or "(no output)"
-            return jsonify({"ok": True, "logs": output[-8000:]})
+            # Forward to Go Control Plane API (same as other container actions)
+            api_endpoint = f"{GO_API_URL}/api/containers/logs"
+            resp = requests.post(api_endpoint, json={"name": target, "tail": "80"}, timeout=15)
+            if resp.status_code != 200:
+                err_data = resp.json() if resp.content else {}
+                return jsonify({"ok": False, "error": err_data.get("error", f"API Error {resp.status_code}")}), resp.status_code
+            return jsonify(resp.json())
+        except requests.exceptions.RequestException as e:
+            return jsonify({"ok": False, "error": f"Failed to connect to Go Control Plane: {e}"}), 502
         except Exception as e:
             return jsonify({"ok": False, "error": str(e)}), 500
 
