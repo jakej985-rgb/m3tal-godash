@@ -159,10 +159,14 @@ function updateGpuFull() {
     if (liveStats.gpuActive) {
         setText('stat-gpu-usage-val', `${liveStats.gpuLoad}%`);
         setText('stat-gpu-temp-val-split', `${liveStats.gpuTemp}°C`);
+        const total = liveStats.gpuMemTotal || 1024;
+        const totalStr = total >= 1024 ? `${(total/1024).toFixed(0)}GB` : `${total}MB`;
+        setText('stat-gpu-mem-label', `${totalStr} VRAM`);
         setText('stat-gpu-mem-val-split', `${liveStats.gpuMem}MB`);
     } else {
         setText('stat-gpu-usage-val', 'OFF');
         setText('stat-gpu-temp-val-split', '--°C');
+        setText('stat-gpu-mem-label', 'VRAM');
         setText('stat-gpu-mem-val-split', 'SB');
     }
 }
@@ -320,6 +324,7 @@ async function refreshHardware() {
             liveStats.gpuLoad = gData.load !== undefined ? gData.load : 0;
             liveStats.gpuTemp = gData.temp != null ? Math.round(gData.temp) : '--';
             liveStats.gpuMem  = gData.mem_used != null ? gData.mem_used : '--';
+            liveStats.gpuMemTotal = gData.mem_total != null ? gData.mem_total : 1024;
         }
         updateGpuFull();
 
