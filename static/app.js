@@ -151,7 +151,8 @@ function updateCpuFull() {
     setText('stat-cpu-usage-val', `${liveStats.cpu.toFixed(1)}%`);
     setText('stat-cpu-temp-val-split', `${liveStats.cpuTemp}°C`);
     const total = liveStats.memTotal || 16.0;
-    setText('stat-cpu-mem-val-split', `${liveStats.mem.toFixed(1)} / ${total.toFixed(1)} GB`);
+    setText('stat-cpu-mem-label', `${total.toFixed(1)} GB RAM`);
+    setText('stat-cpu-mem-val-split', `${liveStats.mem.toFixed(1)} GB`);
 }
 
 function updateGpuFull() {
