@@ -106,54 +106,56 @@ setInterval(() => {
 
 async function loadFleet() {
     try {
-        const [hRes, mRes] = await Promise.all([fetch('/api/health/report'), fetch('/api/metrics')]);
+        const [hRes, mRes] = await Promise.all([fetch('/api/health'), fetch('/api/metrics')]);
         const hData = await hRes.json();
         const mData = await mRes.json();
 
-        const metricsByName = {};
-        (mData.containers || []).forEach(c => {
-            metricsByName[c.name] = c;
-            metricsByName[c.name.replace('m3tal-', '')] = c;
-        });
-
-        const containers = hData?.agent_health?.monitor_containers?.containers || {};
-        const entries = Object.entries(containers);
-
+        // Go backend provides containers as a flat array in health.json
+        const containers = hData.containers || [];
+        
         const isOnline = s => ['online','running'].includes((s||'').toLowerCase());
         const isRestart = s => (s||'').toLowerCase() === 'restarting';
 
-        const online  = entries.filter(([,v]) => isOnline(v.status)).length;
-        const restart = entries.filter(([,v]) => isRestart(v.status)).length;
-        const offline = entries.filter(([,v]) => !isOnline(v.status) && !isRestart(v.status)).length;
+        const online  = containers.filter(c => isOnline(c.state || c.status)).length;
+        const restart = containers.filter(c => isRestart(c.state || c.status)).length;
+        const offline = containers.filter(c => !isOnline(c.state || c.status) && !isRestart(c.state || c.status)).length;
 
-        document.getElementById('fl-total').textContent   = entries.length;
+        document.getElementById('fl-total').textContent   = containers.length;
         document.getElementById('fl-online').textContent  = online;
         document.getElementById('fl-restart').textContent = restart;
         document.getElementById('fl-offline').textContent = offline;
-        document.getElementById('fleet-online-badge').textContent = `${online} / ${entries.length} running`;
+        document.getElementById('fleet-online-badge').textContent = `${online} / ${containers.length} running`;
 
-        const order = { running:0, online:0, restarting:1, offline:2, missing:3, unknown:4 };
-        entries.sort((a,b) => (order[(a[1].status||'').toLowerCase()]??4) - (order[(b[1].status||'').toLowerCase()]??4));
+        // Sort: running first
+        const order = { running:0, online:0, restarting:1, exited:2, dead:3, unknown:4 };
+        const sorted = [...containers].sort((a,b) => {
+            const sA = (a.state || a.status || '').toLowerCase();
+            const sB = (b.state || b.status || '').toLowerCase();
+            return (order[sA] ?? 4) - (order[sB] ?? 4);
+        });
 
         const grid = document.getElementById('fleet-grid');
-        if (entries.length === 0) {
+        if (sorted.length === 0) {
             grid.innerHTML = '<div class="loading-text">No container data yet. Agents are collecting…</div>';
             return;
         }
 
-        grid.innerHTML = entries.map(([name, info]) => {
-            const status = info.status || 'unknown';
-            const sc = isOnline(status) ? 'running' : isRestart(status) ? 'restarting' : 'offline';
-            const m  = metricsByName[name] || {};
-            const cpu = m.cpu != null ? m.cpu.toFixed(1) + '%' : '—';
-            const mem = m.mem_usage || '—';
+        grid.innerHTML = sorted.map(c => {
+            const name = c.name || 'unknown';
+            const state = (c.state || c.status || 'unknown').toLowerCase();
+            const sc = isOnline(state) ? 'running' : isRestart(state) ? 'restarting' : 'offline';
+            
+            const cpu = c.cpu != null ? c.cpu.toFixed(1) + '%' : '—';
+            // If the backend doesn't provide mem usage string, we can try to find it in metrics
+            const mem = c.mem != null ? c.mem.toFixed(1) + '%' : '—';
+            
             return `
                 <div class="fleet-card">
                     <div class="fleet-card-top">
                         <span class="fleet-card-name">${name}</span>
-                        <span class="badge ${sc}">${status.toUpperCase()}</span>
+                        <span class="badge ${sc}">${state.toUpperCase()}</span>
                     </div>
-                    <div class="fleet-card-detail">${info.raw_status || ''}</div>
+                    <div class="fleet-card-detail">${c.status || state}</div>
                     <div class="fleet-meta">
                         <div class="fleet-meta-item">CPU<span>${cpu}</span></div>
                         <div class="fleet-meta-item">RAM<span>${mem}</span></div>

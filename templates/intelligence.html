@@ -130,16 +130,17 @@ async function load() {
             : actions.slice(0,20).map(d => `<div class="event-item"><div class="event-header"><span class="event-target">${d.target||d.action||'System'}</span><span class="badge restarting">${d.action||d.type||'action'}</span></div><div class="event-detail">${d.reason||''}</div></div>`).join('');
 
         const agents = hData.agent_health || {};
-        const agentEntries = Object.entries(agents).filter(([k]) => k !== 'monitor_containers');
+        const agentEntries = Object.entries(agents);
         const healthy = agentEntries.filter(([,v]) => v.status === 'healthy').length;
         const failing = agentEntries.length - healthy;
+        
         document.getElementById('ii-score').textContent   = `${hData.score||0}%`;
         document.getElementById('ii-healthy').textContent = healthy;
         document.getElementById('ii-failing').textContent = failing;
 
         document.getElementById('agent-grid').innerHTML = agentEntries.map(([name, info]) => {
-            const s = (info.mode || info.status || 'unknown').toLowerCase();
-            const cls = s === 'healthy' ? 'healthy' : s === 'stale' ? 'stale' : 'failing';
+            const s = (info.status || 'unknown').toLowerCase();
+            const cls = s === 'healthy' ? 'healthy' : 'failing';
             return `<div class="agent-card"><span class="agent-name">${name}</span><span class="agent-status ${cls}">${s.toUpperCase()}</span></div>`;
         }).join('');
     } catch(e) { console.error(e); }
