@@ -9,6 +9,7 @@ import json
 import secrets
 import threading
 import hmac
+import time
 from flask import Flask, render_template, jsonify, request, session, redirect, url_for
 from flask_socketio import SocketIO, emit, join_room
 from functools import wraps
@@ -18,7 +19,7 @@ import logging
 from auth import load_users, resolve_users_path, verify_password
 from pathlib import Path
 
-# M3TAL Dashboard (v2.0 API-Only)
+# M3TAL Dashboard (v2.1 Hardened)
 # Responsibility: Visual interface. NO system logic allowed.
 
 logging.basicConfig(
@@ -53,16 +54,21 @@ def login_required(role=None):
         return decorated_function
     return decorator
 
-def fetch_api(endpoint):
-    """Proxy helper to fetch from the Go API."""
-    try:
-        resp = requests.get(f"{GO_API_URL}{endpoint}", timeout=5)
-        if resp.status_code == 200:
-            return resp.json()
-        return {"error": f"API Error {resp.status_code}"}
-    except Exception as e:
-        logger.error(f"Failed to fetch {endpoint}: {e}")
-        return {"error": str(e)}
+def fetch_api(endpoint, retries=3):
+    """Hardened proxy helper with retry logic."""
+    for attempt in range(retries):
+        try:
+            resp = requests.get(f"{GO_API_URL}{endpoint}", timeout=3)
+            if resp.status_code == 200:
+                return resp.json()
+            logger.warning(f"API Attempt {attempt+1} failed: HTTP {resp.status_code}")
+        except Exception as e:
+            logger.warning(f"API Attempt {attempt+1} failed: {e}")
+        
+        if attempt < retries - 1:
+            time.sleep(0.5)
+            
+    return {"error": "API Unavailable after multiple retries"}
 
 # --- Routes ---
 
@@ -164,10 +170,12 @@ def api_action():
         return jsonify({"ok": False, "error": "Missing action or container"}), 400
 
     try:
-        resp = requests.post(f"{GO_API_URL}/api/containers/{action}", json={"name": container}, timeout=10)
+        # Action requests have longer timeouts
+        resp = requests.post(f"{GO_API_URL}/api/containers/{action}", json={"name": container}, timeout=15)
         return jsonify(resp.json()), resp.status_code
     except Exception as e:
-        return jsonify({"ok": False, "error": str(e)}), 500
+        logger.error(f"Action failed: {e}")
+        return jsonify({"ok": False, "error": f"API Connection Failure: {e}"}), 500
 
 # --- Websocket Stream ---
 
@@ -183,8 +191,9 @@ def background_metrics_stream():
     while True:
         socketio.sleep(2)
         try:
-            metrics = fetch_api("/api/metrics")
-            socketio.emit('metrics_update', {"system": metrics}, to=AUTHENTICATED_ROOM)
+            metrics = fetch_api("/api/metrics", retries=1) # Fast fail for real-time
+            if "error" not in metrics:
+                socketio.emit('metrics_update', {"system": metrics}, to=AUTHENTICATED_ROOM)
         except Exception as e:
             logger.error(f"Stream error: {e}")
 
