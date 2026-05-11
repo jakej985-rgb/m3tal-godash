@@ -31,6 +31,7 @@ logger = logging.getLogger("m3tal-godash")
 
 # Configuration
 GO_API_URL = os.getenv("GO_API_URL", "http://localhost:5050")
+GO_API_TOKEN = os.getenv("GO_API_TOKEN")
 DASHBOARD_SECRET = os.getenv("DASHBOARD_SECRET") or secrets.token_hex(32)
 USERS_JSON = os.fspath(resolve_users_path(Path(__file__).resolve().parent))
 ASYNC_MODE = "eventlet" if eventlet is not None else "threading"
@@ -58,7 +59,11 @@ def fetch_api(endpoint, retries=3):
     """Hardened proxy helper with retry logic."""
     for attempt in range(retries):
         try:
-            resp = requests.get(f"{GO_API_URL}{endpoint}", timeout=3)
+            headers = {}
+            if GO_API_TOKEN:
+                headers["X-API-Token"] = GO_API_TOKEN
+                
+            resp = requests.get(f"{GO_API_URL}{endpoint}", headers=headers, timeout=3)
             if resp.status_code == 200:
                 return resp.json()
             logger.warning(f"API Attempt {attempt+1} failed: HTTP {resp.status_code}")
@@ -171,7 +176,11 @@ def api_action():
 
     try:
         # Action requests have longer timeouts
-        resp = requests.post(f"{GO_API_URL}/api/containers/{action}", json={"name": container}, timeout=15)
+        headers = {}
+        if GO_API_TOKEN:
+            headers["X-API-Token"] = GO_API_TOKEN
+            
+        resp = requests.post(f"{GO_API_URL}/api/containers/{action}", json={"name": container}, headers=headers, timeout=15)
         return jsonify(resp.json()), resp.status_code
     except Exception as e:
         logger.error(f"Action failed: {e}")
