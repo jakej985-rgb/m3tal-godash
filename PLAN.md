@@ -16,8 +16,10 @@ Visual interface for system.
 
 API only:
 
+```
 GET /status
 GET /metrics
+```
 
 ---
 
@@ -25,7 +27,7 @@ GET /metrics
 
 ### 1. No system logic
 
-No:
+❌ No:
 - Docker commands
 - File system access
 - Agents
@@ -34,7 +36,9 @@ No:
 
 ### 2. API only communication
 
+```
 dashboard → API → core
+```
 
 ---
 
