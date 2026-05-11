@@ -1,63 +1,51 @@
-**DocSmith Protocol Initiated.** 
-*Analyzing Repository Structure...*
-*Detected Status: Uninitialized/Empty Infrastructure.*
-*Project Identification: M3tal-Media-Server.*
+# 🖥️ M3TAL GoDash (Visual Interface)
 
-Since the repository currently contains no modules or infrastructure code, I have drafted the **Architectural Blueprint** README. This establishes the "Mission Control" standards for your Go-native migration.
+This repository contains the **Dashboard and Visualization Layer** for the M3TAL platform. It provides a real-time "Mission Control" interface for monitoring container health, system metrics, and AI stability.
 
-***
+## 📦 Deployment (Standalone)
 
-# M3tal-Media-Server
+> [!IMPORTANT]
+> GoDash is typically deployed as part of the unified M3TAL stack via `m3tal.py up`. Use these instructions only for standalone development or debugging.
 
-**Status:** `Core Orchestrator - In Development`
-**Architecture:** `Go-Native Migration`
+### 1. Prerequisites
+- **Python**: v3.10+
+- **Docker**: For containerized deployment
+- **M3TAL Backend**: Requires a running instance of `m3tal-goback` API
 
-M3tal-Media-Server serves as the central command node for the M3TAL Ecosystem. It functions as the primary orchestrator, responsible for managing media ingestion, indexing, and resource distribution across the infrastructure.
+### 2. Configuration (`.env`)
+GoDash requires the following environment variables:
 
----
-
-## 🏗️ Architectural Overview
-The M3tal-Media-Server is built for high-performance resource orchestration. It operates as the "Brain" of the ecosystem, maintaining strict API-only communication protocols with the dashboard and backend services.
-
-### Core Ecosystem Pillars
-*   **Orchestrator (Core):** This repository. Manages lifecycle events and media stream processing.
-*   **Infrastructure:** Standardized to host-level pathing (`/mnt`) to ensure direct volume access for media assets.
-*   **Communication:** All internal service communication is facilitated via gRPC/REST APIs. No direct database sharing between modules.
-
----
-
-## 🚀 Migration Status: Go-Native
-The ecosystem is currently undergoing a migration to Go-native implementation. 
-*   **Objective:** Replace legacy service wrappers with high-concurrency Go routines.
-*   **Performance Goal:** Sub-millisecond latency for orchestration signals.
-*   **Current State:** Establishing base-level service structs and HTTP/gRPC transport layers.
-
----
-
-## 🛠️ Deployment Standards
-*As this project matures, all deployments follow the containerized "Mission Control" standard.*
-
-```bash
-# Standard Build Process
-go build -o m3tal-server ./cmd/server/main.go
-
-# Docker Orchestration (Once configured)
-docker build -t m3tal/media-server:latest .
-docker run -v /mnt/media:/mnt/media -p 8080:8080 m3tal/media-server:latest
+```ini
+BACKEND_URL=http://m3tal-goback:8080
+DASHBOARD_SECRET=your_shared_secret
+STATE_DIR=./state
+DEBUG=false
 ```
 
----
+### 3. Docker Launch
+```bash
+docker build -t ghcr.io/jakej985-rgb/m3tal-godash:latest .
+docker run -d \
+  --name m3tal-godash \
+  --network proxy \
+  -p 8080:8080 \
+  -e BACKEND_URL=http://m3tal-goback:8080 \
+  ghcr.io/jakej985-rgb/m3tal-godash:latest
+```
 
-## 🔗 Related Projects
-This repository operates in lockstep with the following components:
+## 🧱 Architecture
+GoDash is a lightweight Flask-based web application that consumes the M3TAL Backend API. It handles:
+- **Metric Visualization**: High-density instrument cards for CPU/GPU/Network.
+- **Service Management**: Start/Stop/Restart actions via the API.
+- **Log Streaming**: Real-time access to system and agent logs.
 
-*   [**m3tal-goback**](https://github.com/m3tal/m3tal-goback): The primary backend API service providing persistent data layer support.
-*   [**m3tal-godash**](https://github.com/m3tal/m3tal-godash): The React/Go-WASM dashboard providing visual monitoring for all media orchestrations.
+## 🛠 Development
+```bash
+# Setup environment
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
 
----
-
-## 📡 Mission Control
-*DocSmith Note: Ensure all future PRs adhere to the /mnt directory mapping convention. Unauthorized pathing will be flagged by the orchestrator.*
-
----
-*Authorized by DocSmith | M3TAL Ecosystem Architecture Team*
+# Run in debug mode
+python server.py
+```
